@@ -1,1 +1,1 @@
-# llm
+# This is an implementation of a GPT2 LLM architecture
