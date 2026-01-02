@@ -23,3 +23,20 @@ def create_dataloader(txt, tokenizer, batch_size=4, max_length=256, stride=128, 
     dataset = GPTDataset(txt, tokenizer, max_length, stride)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last, num_workers=num_workers)
     return dataloader
+
+def load_verdict_data(tokenizer):
+    file_path = "training-data/the-verdict.txt"
+    with open(file_path, "r", encoding="utf-8") as file:
+        text_data = file.read()
+
+    total_characters = len(text_data)
+    total_tokens = len(tokenizer.encode(text_data))
+    print("Verdict characters:", total_characters)
+    print("Verdict tokens:", total_tokens)
+
+    train_ratio = 0.90
+    split_idx = int(train_ratio * len(text_data))
+    train_data = text_data[:split_idx]
+    val_data = text_data[split_idx:]
+
+    return train_data, val_data

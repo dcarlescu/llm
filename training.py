@@ -33,6 +33,7 @@ def evaluate_model(model, train_loader, val_loader, device, eval_iter):
         train_loss = calc_loss_loader(train_loader, model, device, eval_iter)
         val_loss = calc_loss_loader(val_loader, model, device, eval_iter)
     model.train()
+    print(f"Evaluation complete. Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
     return train_loss, val_loss
 
 def generate_and_print_sample(model, tokenizer, device, start_context):

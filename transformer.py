@@ -7,30 +7,30 @@ class TransformerBlock(nn.Module):
     def __init__(self, cfg):
         super().__init__()
 
-        self.multi_head_attn = MultiHeadAttention(
+        self.att = MultiHeadAttention(
                 d_in=cfg["emb_dim"], 
                 d_out=cfg["emb_dim"], 
                 context_length=cfg["context_length"], 
                 dropout=cfg["drop_rate"], 
                 num_heads=cfg["num_heads"], 
-                qkv_bias=False)
+                qkv_bias=cfg["qkv_bias"])
         
-        self.ln1 = LayerNorm(cfg["emb_dim"])
-        self.ln2 = LayerNorm(cfg["emb_dim"])
+        self.norm1 = LayerNorm(cfg["emb_dim"])
+        self.norm2 = LayerNorm(cfg["emb_dim"])
         self.ff = FeedForward(cfg)
-        self.dropout = nn.Dropout(cfg["drop_rate"])
+        self.drop_shortcut = nn.Dropout(cfg["drop_rate"])
 
     def forward(self, x):
         shortcut = x
-        x = self.ln1(x)
-        x = self.multi_head_attn(x) #already includes a dropout layer
-        x = self.dropout(x)
+        x = self.norm1(x)
+        x = self.att(x) #already includes a dropout layer
+        x = self.drop_shortcut(x)
         x = x + shortcut #add shortcut connection
 
         shortcut = x #save the input for the next shortcut
-        x = self.ln2(x)
+        x = self.norm2(x)
         x = self.ff(x)
-        x = self.dropout(x)
+        x = self.drop_shortcut(x)
         x = x + shortcut #add shortcut connection
         return x
 
