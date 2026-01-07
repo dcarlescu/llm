@@ -6,9 +6,11 @@ import numpy as np
 from config import GPT_CONFIG_SMALL
 from data_loader import create_dataloader, load_verdict_data
 from gpt import GPTModel
+import gpt
 from gpt_download import load_gpt2_model_124M
 from inference import generate
 from tokenizer import text_to_token_ids, token_ids_to_text
+import tokenizer
 from training import evaluate_model
 
 model_configs = {
@@ -56,48 +58,58 @@ def load_weights_into_gpt(gpt, params):
     gpt.final_norm.shift = assign(gpt.final_norm.shift, params["b"])
     gpt.out_head.weight = assign(gpt.out_head.weight, params["wte"])
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-gpt = GPTModel(OPENAI_CONFIG)
-gpt.eval()
+def load_gpt_model(device):
+    gpt = GPTModel(OPENAI_CONFIG)
+    gpt.eval()
 
-settings, params = load_gpt2_model_124M()
-load_weights_into_gpt(gpt, params)
-gpt.to(device)
+    settings, params = load_gpt2_model_124M()
+    load_weights_into_gpt(gpt, params)
+    gpt.to(device)
+    return gpt
 
-tokenizer = tiktoken.get_encoding("gpt2")
-torch.manual_seed(123)
-token_ids = generate(
-    model=gpt,
-    idx=text_to_token_ids("Every effort moves you", tokenizer).to(device),
-    max_new_tokens=25,
-    context_size=OPENAI_CONFIG["context_length"],
-    top_k=50,
-    temperature=1.5
-)
-print("Output text:\n", token_ids_to_text(token_ids, tokenizer))
+def evaluate_verdict_model(model, device, tokenizer):
+    #evaluate the model
+    train_data, val_data = load_verdict_data(tokenizer)
+    train_loader = create_dataloader(
+                    train_data,
+                    tokenizer,
+                    batch_size=2,
+                    max_length=OPENAI_CONFIG["context_length"],
+                    stride=OPENAI_CONFIG["context_length"],
+                    drop_last=True,
+                    shuffle=True,
+                    num_workers=0)
 
-#evaluate the model
-train_data, val_data = load_verdict_data(tokenizer)
-train_loader = create_dataloader(
-                train_data,
-                tokenizer,
-                batch_size=2,
-                max_length=OPENAI_CONFIG["context_length"],
-                stride=OPENAI_CONFIG["context_length"],
-                drop_last=True,
-                shuffle=True,
-                num_workers=0)
+    val_loader = create_dataloader(
+                    val_data,
+                    tokenizer,
+                    batch_size=2,
+                    max_length=OPENAI_CONFIG["context_length"],
+                    stride=OPENAI_CONFIG["context_length"],
+                    drop_last=False,
+                    shuffle=False,
+                    num_workers=0)
 
-val_loader = create_dataloader(
-                val_data,
-                tokenizer,
-                batch_size=2,
-                max_length=OPENAI_CONFIG["context_length"],
-                stride=OPENAI_CONFIG["context_length"],
-                drop_last=False,
-                shuffle=False,
-                num_workers=0)
+    evaluate_model(model, train_loader, val_loader, device, eval_iter=10)
 
-evaluate_model(gpt, train_loader, val_loader, device, eval_iter=10)
+def generate_output(model, device, tokenizer, prompt):
+    token_ids = generate(
+        model=model,
+        idx=text_to_token_ids(prompt, tokenizer).to(device),
+        max_new_tokens=25,
+        context_size=OPENAI_CONFIG["context_length"]
+    )
+    return token_ids_to_text(token_ids, tokenizer)
+
+def generate_sample_output():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    gpt = load_gpt_model(device)
+    
+    tokenizer = tiktoken.get_encoding("gpt2")
+    torch.manual_seed(123)
+    print("Output text:\n", generate_output(gpt, device, tokenizer, "Every effort moves you"))
+
+#generate_sample_output()
+
 
 
